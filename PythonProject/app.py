@@ -5,7 +5,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from cryptography.fernet import Fernet
 from flask_cors import CORS
 from datetime import datetime, timedelta
-import uuid, io, qrcode, traceback, re
+import uuid, io, qrcode, traceback, re, secrets
+from flask_mail import Mail, Message
 
 # ====================== APP CONFIG =========================
 app = Flask(__name__)
@@ -29,7 +30,7 @@ fernet = Fernet(FERNET_KEY)
 def _json_error(message, code=400):
     return jsonify({"success": False, "message": message}), code
 
-# ====================== AUTH ROUTES =========================
+# ====================== AUTH ROUTES-LOGIN =========================
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -46,6 +47,7 @@ def api_login():
         account = cursor.fetchone()
         cursor.close()
 
+        #Navigate to admin dashboard for admins only
         if account and check_password_hash(account['password'], password):
             user_id = account['user_id']
             is_admin = int(account.get('is_admin', 0))
@@ -84,11 +86,18 @@ def api_register():
 
         is_admin = 1 if admin_key == 'your_admin_secret_key' else 0
 
+
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        #username validation
         cursor.execute('SELECT * FROM register_details WHERE username = %s', (username,))
         if cursor.fetchone():
             cursor.close()
-            return _json_error("Account already exists", 400)
+            return _json_error("Username already taken, please choose another", 400)
+        # email validation
+        cursor.execute('SELECT * FROM register_details WHERE email_id = %s', (email,))
+        if cursor.fetchone():
+            cursor.close()
+            return _json_error("Email already registered", 400)
 
         hashed_pw = generate_password_hash(password)
         cursor.execute(
@@ -100,6 +109,90 @@ def api_register():
 
         # Note: your DB trigger or external process should create login_detail row if needed.
         return jsonify({"success": True, "message": "Registered successfully"}), 201
+
+    except Exception as e:
+        traceback.print_exc()
+        return _json_error(str(e), 500)
+# ====================== RESET PASSWORD =========================
+# EMAIL CONFIGURATION
+app.config.update(
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USERNAME='priyadharshininadimuthu@gmail.com',   # replace with your email
+    MAIL_PASSWORD='Priya@2002'     # replace with app password if Gmail
+)
+mail = Mail(app)
+# ====================== REQUEST PASSWORD =========================
+# Step 1: Request password reset link
+@app.route("/request_password_reset", methods=["POST"])
+def api_request_password_reset():
+    data = request.get_json()
+    email = data.get("email")
+
+    if not email:
+        return jsonify({"success": False, "message": "Email is required"}), 400
+
+    # Check user exists in DB
+    user = True  # simulate user found
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    # Generate token
+    token = "reset_token_example"
+
+    # Normally send email with link
+    print(f"Reset link for {email}: http://localhost:5000/reset_password/{token}")
+
+    return jsonify({"success": True, "message": "Password reset link sent"}), 200
+
+
+# Step 2: Reset password (non-API / simple test)
+@app.route("/reset_password", methods=["POST"])
+def api_reset_password_web():
+    data = request.get_json()
+    token = data.get("token")
+    new_password = data.get("new_password")
+
+    if not token or not new_password:
+        return jsonify({"success": False, "message": "Token and new password required"}), 400
+
+    if token != "reset_token_example":
+        return jsonify({"success": False, "message": "Invalid or expired token"}), 400
+
+    # Update password in DB
+    return jsonify({"success": True, "message": "Password reset successful"}), 200
+
+
+# Step 3: Reset password via API (Flask + MySQL)
+@app.route('/api/reset_password', methods=['POST'])
+def api_reset_password_mysql():
+    try:
+        data = request.get_json(force=True)
+        token = data.get('token')
+        new_password = data.get('password')
+
+        if not token or not new_password:
+            return _json_error("Token and new password required", 400)
+
+        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cursor.execute(
+            "SELECT * FROM password_reset_tokens WHERE token = %s AND used = 0 AND expires_at >= %s",
+            (token, datetime.utcnow())
+        )
+        record = cursor.fetchone()
+        if not record:
+            cursor.close()
+            return _json_error("Invalid or expired token", 400)
+
+        hashed_pw = generate_password_hash(new_password)
+        user_id = record['user_id']
+        cursor.execute("UPDATE register_details SET password = %s WHERE user_id = %s", (hashed_pw, user_id))
+        cursor.execute("UPDATE password_reset_tokens SET used = 1 WHERE id = %s", (record['id'],))
+        mysql.connection.commit()
+        cursor.close()
+
+        return jsonify({"success": True, "message": "Password updated successfully"})
 
     except Exception as e:
         traceback.print_exc()
@@ -328,7 +421,7 @@ def api_admin_weekly_visitors():
 def api_admin_users():
     try:
         cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute("SELECT user_id, username, email_id FROM register_details WHERE is_admin = 0")
+        cursor.execute("SELECT user_id, fname, lname, gender, contact_number, email_id, address FROM user_detail")
         users = cursor.fetchall()
         cursor.close()
 
