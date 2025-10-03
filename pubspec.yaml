@@ -1,0 +1,40 @@
+name: qr_gate_app
+description: A Flutter app for QR-based entry and admin logs
+publish_to: 'none'
+
+version: 1.0.0+1
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  shared_preferences: ^2.2.3
+  qr_flutter: ^4.1.0
+  provider: ^6.1.2
+  cupertino_icons: ^1.0.8
+  qr_code_scanner: ^1.0.1
+  fl_chart: ^1.1.1
+  intl: ^0.20.2
+  file_picker: ^10.3.3
+  image: 4.5.4
+  zxing_scanner: ^1.0.0
+  zxing2: ^0.2.4
+  path_provider: ^2.1.5
+  image_picker: ^1.2.0
+  qr_code_tools: ^0.2.0
+  lottie: ^3.3.2
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+  - assets/animation/gate_open.json
+  - assets/animation/gate_close.json
+
