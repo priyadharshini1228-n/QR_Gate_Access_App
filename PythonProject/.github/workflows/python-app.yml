@@ -1,33 +1,34 @@
-
+# .github/workflows/python-app.yml
 
 name: Run Flask Unit Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-    - name: ⬇️ Checkout code
+    - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: 🐍 Set up Python
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10'  # or your Python version
+        python-version: '3.10'
 
-    - name: 📦 Install dependencies
+    - name: Install dependencies
       run: |
         python -m venv venv
         source venv/bin/activate
         pip install -r requirements.txt
 
-    - name: ⚙️ Run Tests
+    - name: Run tests
       run: |
         source venv/bin/activate
-        python -m unittest discover -s . -p "test_appv3.py"
+        python -m unittest discover -s . -p "test_*.py"
